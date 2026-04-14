@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькулятор бюджета семьи</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root {
+    --фон: #174B4C;
+    --плашка: #1F5F61;
+    --акцент: #E89528;
+    --доход: #6EDC8C;
+    --расход: #FF8A4C;
+    --текст: #ffffff;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--фон);
+    color: var(--текст);
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+}
+
+.top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.filter {
+    background: var(--акцент);
+    border: none;
+    padding: 10px 15px;
+    border-radius: 10px;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 20px;
+}
+
+.card {
+    background: var(--плашка);
+    padding: 20px;
+    border-radius: 16px;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.stat-val {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: white;
+}
+
+button.save {
+    margin-top: 12px;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    background: var(--акцент);
+    border-radius: 12px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="top">
+        <h2>💰 Калькулятор бюджета семьи</h2>
+        <select id="filter" class="filter" onchange="render()"></select>
+    </div>
+
+    <div class="grid">
+
+        <div>
+            <div class="stats">
+                <div class="card">
+                    Доходы
+                    <div id="inc" class="stat-val" style="color: var(--доход)">0 ₽</div>
+                </div>
+
+                <div class="card">
+                    Расходы
+                    <div id="exp" class="stat-val" style="color: var(--расход)">0 ₽</div>
+                </div>
+
+                <div class="card">
+                    Баланс
+                    <div id="bal" class="stat-val">0 ₽</div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>История</h3>
+                <table>
+                    <tbody id="list"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h3>Добавить</h3>
+
+                <select id="type" onchange="handleTypeChange()">
+                    <option value="income">Доход</option>
+                    <option value="expense">Расход</option>
+                </select>
+
+                <select id="cat" onchange="handleCategoryChange()"></select>
+
+                <input id="amt" type="number" placeholder="Сумма">
+
+                <button class="save" onclick="add()">Внести</button>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>Диаграмма</h3>
+                <canvas id="chart"></canvas>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+let items = JSON.parse(localStorage.getItem('b')) || [];
+let chart;
+
+// 🔥 КАТЕГОРИИ
+const категории = {
+    income: [
+        "Оплата за работу куратором",
+        "Оплата за гайды",
+        "Смм",
+        "Алименты",
+        "Подарки",
+        "Продажа вещей",
+        "Проценты",
+        "Кэшбэк",
+        "Прочее",
+        "Пассивный доход"
+    ],
+    expense: [
+        "Коммунальные платежи",
+        "Налоги",
+        "Продукты",
+        "Бытовая химия, гигиена и проч",
+        "Связь и интернет",
+        "Школа",
+        "Одежда",
+        "Обувь",
+        "Аксессуары",
+        "Транспорт",
+        "Кот",
+        "Кафе и проч",
+        "Развлечения",
+        "Путешествия",
+        "Подписки",
+        "Аптеки",
+        "Врачи, анализы и проч",
+        "Подарки",
+        "Прочее",
+        "Вклады"
+    ]
+};
+
+// 🔥 ОБНОВЛЕНИЕ КАТЕГОРИЙ
+function updateCategories() {
+    const type = document.getElementById('type').value;
+    const cat = document.getElementById('cat');
+
+    cat.innerHTML = '';
+
+    категории[type].forEach(item => {
+        cat.innerHTML += `<option value="${item}">${item}</option>`;
+    });
+
+    handleCategoryChange(); // 🔥 подсветка после обновления
+}
+
+// 🔥 смена типа
+function handleTypeChange() {
+    const typeSelect = document.getElementById('type');
+    const options = typeSelect.querySelectorAll('option');
+
+    // затемняем все
+    options.forEach(opt => opt.style.color = '#333333');
+
+    // выбранный делаем белым
+    typeSelect.selectedOptions[0].style.color = 'white';
+
+    updateCategories();
+}
+
+// 🔥 смена категории
+function handleCategoryChange() {
+    const catSelect = document.getElementById('cat');
+    const options = catSelect.querySelectorAll('option');
+
+    // затемняем все
+    options.forEach(opt => opt.style.color = '#333333');
+
+    // выбранную делаем белой
+    if (catSelect.selectedOptions.length > 0) {
+        catSelect.selectedOptions[0].style.color = 'white';
+    }
+}
+
+function add() {
+    const t = type.value;
+    const c = cat.value;
+    const a = +amt.value;
+
+    if (!c || !a) return;
+
+    const d = new Date();
+
+    items.push({
+        id: Date.now(),
+        t,
+        c,
+        a,
+        m: d.toLocaleString('ru-RU', { month: 'long' }),
+        y: d.getFullYear(),
+        f: d.toLocaleDateString('ru-RU')
+    });
+
+    localStorage.setItem('b', JSON.stringify(items));
+    render();
+
+    amt.value = '';
+}
+
+function render() {
+    const list = document.getElementById('list');
+    list.innerHTML = '';
+
+    let inc = 0;
+    let exp = 0;
+    let data = {};
+
+    items.slice().reverse().forEach(i => {
+        if (i.t === 'income') inc += i.a;
+        else {
+            exp += i.a;
+            data[i.c] = (data[i.c] || 0) + i.a;
+        }
+
+        list.innerHTML += `
+        <tr>
+            <td>${i.c}</td>
+            <td style="text-align:right">${i.t === 'income' ? '+' : '-'}${i.a} ₽</td>
+        </tr>`;
+    });
+
+    incEl.innerText = inc + ' ₽';
+    expEl.innerText = exp + ' ₽';
+
+    const bal = inc - exp;
+    balEl.innerText = bal + ' ₽';
+
+    draw(data);
+}
+
+function draw(d) {
+    const ctx = document.getElementById('chart');
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(d),
+            datasets: [{
+                data: Object.values(d),
+                backgroundColor: ['#E89528','#6EDC8C','#FF8A4C','#6FA8DC']
+            }]
+        }
+    });
+}
+
+const incEl = document.getElementById('inc');
+const expEl = document.getElementById('exp');
+const balEl = document.getElementById('bal');
+
+// 🔥 запуск
+updateCategories();
+handleTypeChange();
+render();
+</script>
+
+</body>
+</html>
