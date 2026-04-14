@@ -94,6 +94,38 @@ body {
     border-radius: 14px;
 }
 
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.history-table td {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.history-actions {
+    width: 34px;
+    text-align: right;
+}
+
+button.icon-x {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.10);
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 28px;
+    padding: 0;
+}
+
+button.icon-x:hover {
+    background: rgba(255,255,255,0.16);
+}
+
 
 .stat-val {
     font-size: 1.5rem;
@@ -268,7 +300,7 @@ button.save {
         <div>
             <div class="card">
                 <h3>История</h3>
-                <table>
+                <table class="history-table">
                     <tbody id="list"></tbody>
                 </table>
             </div>
@@ -437,6 +469,12 @@ function addExpense() {
     document.getElementById('expense_amt').value = '';
 }
 
+function removeItem(id) {
+    items = items.filter(x => x.id !== id);
+    localStorage.setItem('b', JSON.stringify(items));
+    render();
+}
+
 function render() {
     const list = document.getElementById('list');
     list.innerHTML = '';
@@ -461,6 +499,9 @@ function render() {
         <tr>
             <td>${i.c}</td>
             <td style="text-align:right">${i.t === 'income' ? '+' : '-'}${i.a} ₽</td>
+            <td class="history-actions">
+                <button class="icon-x" type="button" aria-label="Удалить" onclick="removeItem(${i.id})">×</button>
+            </td>
         </tr>`;
     });
 
